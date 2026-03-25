@@ -3255,8 +3255,8 @@ void TaskloopContextOp::build(OpBuilder &builder, OperationState &state,
 
 TaskloopWrapperOp TaskloopContextOp::getLoopOp() {
   for (mlir::Operation &op : getRegion().front())
-    if (auto taskloopOp = dyn_cast<TaskloopWrapperOp>(&op))
-      return taskloopOp;
+    if (auto taskloopWrapperOp = dyn_cast<TaskloopWrapperOp>(&op))
+      return taskloopWrapperOp;
   return nullptr;
 }
 
