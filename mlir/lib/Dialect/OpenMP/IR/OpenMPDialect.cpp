@@ -3298,9 +3298,10 @@ LogicalResult TaskloopContextOp::verifyRegions() {
     return isa<TaskloopWrapperOp>(op);
   });
   if (count != 1)
-    return emitOpError() << "expected exactly 1 TaskloopWrapperOp directly nested in "
-                            "the region, but "
-                         << count << " were found";
+    return emitOpError()
+           << "expected exactly 1 TaskloopWrapperOp directly nested in "
+              "the region, but "
+           << count << " were found";
 
   return success();
 }
