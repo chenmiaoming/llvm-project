@@ -158,6 +158,32 @@ static void instrumentAddressImpl(Module &M, IRBuilder<> &IRB,
   Type *IntptrTy = M.getDataLayout().getIntPtrType(
       M.getContext(), AddrTy->getPointerAddressSpace());
   IRB.SetInsertPoint(InsertBefore);
+
+  if (UseCalls) {
+    size_t AccessSizeIndex = TypeStoreSizeToSizeIndex(TypeStoreSize);
+    SmallString<64> CallbackName{"__asan_"};
+    CallbackName += IsWrite ? "store" : "load";
+    Value *AddrLong = IRB.CreatePtrToInt(Addr, IntptrTy);
+    if (SizeArgument) {
+      CallbackName += "N";
+      if (Recover)
+        CallbackName += "_noabort";
+      FunctionCallee Callback = M.getOrInsertFunction(
+          CallbackName,
+          FunctionType::get(IRB.getVoidTy(), {IntptrTy, IntptrTy}, false));
+      IRB.CreateCall(Callback, {AddrLong, SizeArgument});
+    } else {
+      raw_svector_ostream OS(CallbackName);
+      OS << (1ULL << AccessSizeIndex);
+      if (Recover)
+        CallbackName += "_noabort";
+      FunctionCallee Callback = M.getOrInsertFunction(
+          CallbackName, FunctionType::get(IRB.getVoidTy(), {IntptrTy}, false));
+      IRB.CreateCall(Callback, AddrLong);
+    }
+    return;
+  }
+
   size_t AccessSizeIndex = TypeStoreSizeToSizeIndex(TypeStoreSize);
   Type *ShadowTy = IntegerType::get(M.getContext(),
                                     std::max(8U, TypeStoreSize >> AsanScale));
@@ -207,6 +233,21 @@ void instrumentAddress(Module &M, IRBuilder<> &IRB, Instruction *OrigIns,
   Type *IntptrTy = M.getDataLayout().getIntPtrType(AddrTy);
   Value *NumBits = IRB.CreateTypeSize(IntptrTy, TypeStoreSize);
   Value *Size = IRB.CreateLShr(NumBits, ConstantInt::get(IntptrTy, 3));
+
+  if (UseCalls) {
+    Value *AddrLong = IRB.CreatePtrToInt(Addr, IntptrTy);
+    SmallString<64> CallbackName{"__asan_"};
+    CallbackName += IsWrite ? "store" : "load";
+    CallbackName += "N";
+    if (Recover)
+      CallbackName += "_noabort";
+    FunctionCallee Callback = M.getOrInsertFunction(
+        CallbackName,
+        FunctionType::get(IRB.getVoidTy(), {IntptrTy, IntptrTy}, false));
+    IRB.CreateCall(Callback, {AddrLong, Size});
+    return;
+  }
+
   Value *AddrLong = IRB.CreatePtrToInt(Addr, IntptrTy);
   Value *SizeMinusOne =
       IRB.CreateAdd(Size, ConstantInt::getAllOnesValue(IntptrTy));
