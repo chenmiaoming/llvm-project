@@ -2261,7 +2261,13 @@ bool DependenceInfo::banerjeeMIVtest(const SCEV *Src, const SCEV *Dst,
   const SCEV *B0;
   CoefficientInfo *B = collectCoeffInfo(Dst, false, B0);
   BoundInfo *Bound = new BoundInfo[MaxLevels + 1];
-  const SCEV *Delta = SE->getMinusSCEV(B0, A0);
+  const SCEV *Delta = minusSCEVNoSignedOverflow(B0, A0, *SE);
+  if (!Delta) {
+    delete[] Bound;
+    delete[] A;
+    delete[] B;
+    return false;
+  }
   LLVM_DEBUG(dbgs() << "\tDelta = " << *Delta << '\n');
 
   // Compute bounds for all the * directions.
